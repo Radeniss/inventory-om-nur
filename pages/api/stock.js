@@ -1,53 +1,44 @@
-import fs from 'fs';
-import path from 'path';
+import clientPromise from '../../lib/mongodb';
 
-const dbPath = path.resolve(process.cwd(), 'data', 'db.json');
+export default async function handler(req, res) {
+  try {
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB);
+    const productsCollection = db.collection('products');
 
-const readDb = () => {
-  const fileContent = fs.readFileSync(dbPath, 'utf-8');
-  return JSON.parse(fileContent);
-};
+    if (req.method === 'GET') {
+      const products = await productsCollection.find({}).sort({ name: 1 }).toArray();
+      res.status(200).json(products);
 
-const writeDb = (data) => {
-  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
-};
+    } else if (req.method === 'POST') {
+      const { qrCode, name, quantity } = req.body;
 
-export default function handler(req, res) {
-  if (req.method === 'GET') {
-    try {
-      const db = readDb();
-      res.status(200).json(db.products);
-    } catch (error) {
-      res.status(500).json({ message: 'Gagal membaca data produk.' });
-    }
-  } else if (req.method === 'POST') {
-    const { qrCode, name, quantity } = req.body;
-    if (!qrCode || !name || !quantity) {
-      return res.status(400).json({ message: 'Data tidak lengkap' });
-    }
+      if (!qrCode || !name || !quantity) {
+        return res.status(400).json({ message: 'Data tidak lengkap' });
+      }
 
-    try {
-      const db = readDb();
-      const existingProductIndex = db.products.findIndex(p => p.qrCode === qrCode);
+      const existingProduct = await productsCollection.findOne({ qrCode: qrCode });
 
-      if (existingProductIndex > -1) {
-        db.products[existingProductIndex].stock += parseInt(quantity, 10);
+      if (existingProduct) {
+        await productsCollection.updateOne(
+          { qrCode: qrCode },
+          { $inc: { stock: parseInt(quantity, 10) } }
+        );
+        res.status(200).json({ message: `Stok untuk ${name} berhasil diperbarui` });
       } else {
-        db.products.push({
-          id: `PROD-${Date.now()}`,
+        await productsCollection.insertOne({
           qrCode,
           name,
           stock: parseInt(quantity, 10),
         });
+        res.status(201).json({ message: `Produk ${name} berhasil ditambahkan` });
       }
-
-      writeDb(db);
-      res.status(201).json({ message: 'Stok berhasil diperbarui' });
-    } catch (error) {
-      res.status(500).json({ message: 'Gagal menulis data ke database.' });
+    } else {
+      res.setHeader('Allow', ['GET', 'POST']);
+      res.status(405).end(`Method ${req.method} Not Allowed`);
     }
-  } else {
-    res.setHeader('Allow', ['GET', 'POST']);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
   }
 }
