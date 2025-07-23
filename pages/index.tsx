@@ -65,8 +65,6 @@ type MessageType = 'info' | 'success' | 'error';
 
 export default function HomePage() {
     const { data: session, status } = useSession();
-
-    // State untuk aplikasi inventaris
     const [mode, setMode] = useState<'sell' | 'stock-in'>('sell');
     const [scannedResult, setScannedResult] = useState('');
     const [message, setMessage] = useState<{ text: string; type: MessageType }>({ text: '', type: 'info' });
@@ -74,8 +72,6 @@ export default function HomePage() {
     const [showScanner, setShowScanner] = useState(false);
     const [newItemName, setNewItemName] = useState('');
     const [newItemQuantity, setNewItemQuantity] = useState(1);
-
-    // State untuk form login
     const [loginEmail, setLoginEmail] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
     
@@ -136,10 +132,10 @@ export default function HomePage() {
             const data = await response.json();
             showMessage(data.message, response.ok ? 'success' : 'error');
             if (response.ok) fetchProducts();
-        } catch (error) { 
-          console.error(error);
-          showMessage('Error: Terjadi kesalahan pada server.', 'error'); 
-}
+        } catch (error) {
+            console.error(error);
+            showMessage('Error: Terjadi kesalahan pada server.', 'error');
+        }
         setScannedResult('');
     };
 
@@ -157,9 +153,9 @@ export default function HomePage() {
                 setNewItemQuantity(1);
             }
         } catch (error) {
-          console.error(error);
-          showMessage('Error: Terjadi kesalahan pada server.', 'error'); 
-}
+            console.error(error);
+            showMessage('Error: Terjadi kesalahan pada server.', 'error');
+        }
     };
 
     const messageStyles: { [key in MessageType]: string } = {
