@@ -1,7 +1,8 @@
-// pages/index.tsx
 import { useState, useEffect, useCallback } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react'; // Impor hook dari NextAuth
 import QrScanner from '../components/QrScanner'; 
 
+// --- Komponen SalesReport (Tidak berubah) ---
 type SalesReportItem = { productName: string; totalSold: number; };
 const SalesReport = () => {
     const [report, setReport] = useState<SalesReportItem[]>([]);
@@ -57,10 +58,16 @@ const SalesReport = () => {
     );
 };
 
+
+// --- Komponen Utama ---
 type Product = { id: string; name: string; qrCode: string; stock: number };
 type MessageType = 'info' | 'success' | 'error';
 
 export default function HomePage() {
+    // Hook untuk mendapatkan data sesi login
+    const { data: session, status } = useSession();
+
+    // Semua state aplikasi Anda
     const [mode, setMode] = useState<'sell' | 'stock-in'>('sell');
     const [scannedResult, setScannedResult] = useState('');
     const [message, setMessage] = useState<{ text: string; type: MessageType }>({ text: '', type: 'info' });
@@ -68,24 +75,36 @@ export default function HomePage() {
     const [showScanner, setShowScanner] = useState(false);
     const [newItemName, setNewItemName] = useState('');
     const [newItemQuantity, setNewItemQuantity] = useState(1);
-
-    const fetchProducts = async () => {
+    
+    // Semua fungsi handler Anda
+    const fetchProducts = useCallback(async () => {
         try {
             const res = await fetch('/api/stock');
-            const data = await res.json();
-            setProducts(Array.isArray(data) ? data : []);
+            if (res.ok) {
+                const data = await res.json();
+                setProducts(Array.isArray(data) ? data : []);
+            } else {
+                // Jika gagal (misal: 401 Unauthorized), kosongkan produk
+                setProducts([]);
+            }
         } catch (error) {
             console.error("Gagal fetch produk:", error);
             setMessage({text: 'Gagal memuat daftar produk.', type: 'error'})
         }
-    };
-    useEffect(() => { fetchProducts(); }, []);
+    }, []);
+
+    // Gunakan useEffect untuk memuat data HANYA jika sudah login
+    useEffect(() => {
+        if (status === "authenticated") {
+            fetchProducts();
+        }
+    }, [status, fetchProducts]);
 
     const showMessage = (text: string, type: MessageType = 'info') => {
         setMessage({ text, type });
         setTimeout(() => setMessage({ text: '', type: 'info' }), 4000);
     };
-
+    
     const handleScanResult = (result: string) => {
         setShowScanner(false); 
         if (result) {
@@ -135,8 +154,34 @@ export default function HomePage() {
         error: 'bg-red-100 border-red-400 text-red-700',
     };
 
+    // Tampilkan loading saat status sesi sedang diperiksa
+    if (status === "loading") {
+        return <p className="text-center mt-20 text-lg">Memuat...</p>;
+    }
+
+    // Tampilkan halaman login jika pengguna belum terotentikasi
+    if (status === "unauthenticated") {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+                <h1 className="text-3xl font-bold mb-4">Aplikasi Inventaris</h1>
+                <p className="mb-6 text-gray-600">Silakan login untuk melanjutkan.</p>
+                <button onClick={() => signIn()} className="bg-blue-500 text-white px-6 py-2 rounded-lg shadow-md hover:bg-blue-600 transition">
+                    Login / Signup
+                </button>
+            </div>
+        );
+    }
+
+    // Tampilkan aplikasi utama jika pengguna sudah login
     return (
         <main className="container mx-auto p-4 font-sans">
+            <header className="flex justify-between items-center mb-6 pb-4 border-b">
+                <p>Login sebagai: <strong>{session?.user?.email}</strong></p>
+                <button onClick={() => signOut()} className="bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600 transition">
+                    Logout
+                </button>
+            </header>
+
             <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">🏪 Sistem Inventaris Toko</h1>
             <div className="flex justify-center gap-4 mb-4">
                 <button onClick={() => { setMode('sell'); setShowScanner(true); setScannedResult(''); }} className={`px-6 py-2 rounded-lg font-semibold shadow-sm transition-transform transform hover:scale-105 ${mode === 'sell' ? 'bg-red-500 text-white' : 'bg-white text-gray-700 border'}`}>
@@ -176,10 +221,11 @@ export default function HomePage() {
                             <p className="text-gray-500 break-words text-sm mt-1">QR: {product.qrCode}</p>
                             <p className="text-3xl font-bold mt-2 text-indigo-600">Stok: {product.stock}</p>
                         </div>
-                    )) : (<p>Inventaris kosong.</p>)}
+                    )) : (<p className='text-gray-500'>Inventaris Anda kosong.</p>)}
                 </div>
             </div>
-            <SalesReport />
+            {/* Hanya tampilkan laporan jika ada produk */}
+            {products.length > 0 && <SalesReport />}
         </main>
     );
 }
