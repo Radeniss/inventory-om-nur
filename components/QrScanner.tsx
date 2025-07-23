@@ -1,4 +1,3 @@
-// components/QrScanner.tsx
 import { useEffect } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeResult } from 'html5-qrcode';
 
@@ -9,22 +8,7 @@ interface QrScannerProps {
 
 const QrScanner = ({ onScanSuccess, onClose }: QrScannerProps) => {
     useEffect(() => {
-        let scanner: Html5QrcodeScanner;
-
-        const handleSuccess = (decodedText: string, decodedResult: Html5QrcodeResult) => {
-            if (scanner) {
-                scanner.clear().catch(error => {
-                    console.error("Gagal membersihkan scanner.", error);
-                });
-            }
-            onScanSuccess(decodedText);
-        };
-
-        const handleError = (errorMessage: string) => {
-            // Abaikan error "QR code parse error"
-        };
-
-        scanner = new Html5QrcodeScanner(
+        const scanner = new Html5QrcodeScanner(
             'qr-reader-container', 
             {
                 fps: 10,
@@ -33,10 +17,22 @@ const QrScanner = ({ onScanSuccess, onClose }: QrScannerProps) => {
             false
         );
 
+        const handleSuccess = (decodedText: string, _decodedResult: Html5QrcodeResult) => {
+            scanner.clear().catch(error => {
+                console.error("Gagal membersihkan scanner.", error);
+            });
+            onScanSuccess(decodedText);
+        };
+
+        const handleError = (_errorMessage: string) => {
+        };
+        
         scanner.render(handleSuccess, handleError);
 
+        // Fungsi cleanup
         return () => {
-            if (scanner) {
+            // Cek apakah scanner masih aktif sebelum membersihkan
+            if (scanner && scanner.getState()) {
                 scanner.clear().catch(error => {
                     console.error("Gagal membersihkan scanner saat unmount.", error);
                 });
