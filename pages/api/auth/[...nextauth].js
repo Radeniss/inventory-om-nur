@@ -14,7 +14,7 @@ export default NextAuth({
         const client = await clientPromise;
         const db = client.db(process.env.MONGODB_DB);
         const usersCollection = db.collection('users');
-
+        
         const user = await usersCollection.findOne({ email: credentials.email });
         if (!user) {
           throw new Error('No user found with this email');
