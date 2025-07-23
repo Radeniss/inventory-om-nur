@@ -1,115 +1,185 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
+// pages/index.tsx
+import { useState, useEffect, useCallback } from 'react';
+import QrScanner from '../components/QrScanner'; 
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+type SalesReportItem = { productName: string; totalSold: number; };
+const SalesReport = () => {
+    const [report, setReport] = useState<SalesReportItem[]>([]);
+    const [month, setMonth] = useState(new Date().getMonth() + 1);
+    const [year, setYear] = useState(new Date().getFullYear());
+    const [loading, setLoading] = useState(false);
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+    const fetchReport = useCallback(async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`/api/sales-report?month=${month}&year=${year}`);
+            if (response.ok) setReport(await response.json());
+            else setReport([]);
+        } catch (error) { console.error('Error:', error); } 
+        finally { setLoading(false); }
+    }, [month, year]);
 
-export default function Home() {
-  return (
-    <div
-      className={`${geistSans.className} ${geistMono.className} font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20`}
-    >
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              pages/index.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    useEffect(() => { fetchReport(); }, [fetchReport]);
+
+    return (
+        <div className="mt-12 p-4 border rounded-lg bg-gray-50">
+            <h2 className="text-xl font-bold mb-4">📊 Laporan Penjualan</h2>
+            <div className="flex flex-wrap items-center gap-4 mb-4">
+                <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="p-2 border rounded-md">
+                    {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(0, i).toLocaleString('id-ID', { month: 'long' })}</option>)}
+                </select>
+                <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))} className="p-2 border rounded-md w-28" />
+                <button onClick={fetchReport} disabled={loading} className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-400">
+                    {loading ? 'Memuat...' : 'Terapkan Filter'}
+                </button>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-200">
+                        <tr>
+                            <th className="border p-2">Nama Produk</th>
+                            <th className="border p-2 text-center">Total Terjual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {report.length > 0 ? report.map((item, index) => (
+                            <tr key={index} className="hover:bg-gray-100">
+                                <td className="border p-2">{item.productName}</td>
+                                <td className="border p-2 text-center font-semibold">{item.totalSold}</td>
+                            </tr>
+                        )) : (
+                            <tr><td colSpan={2} className="border p-2 text-center">Tidak ada data penjualan.</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+    );
+};
+
+type Product = { id: string; name: string; qrCode: string; stock: number };
+type MessageType = 'info' | 'success' | 'error';
+
+export default function HomePage() {
+    const [mode, setMode] = useState<'sell' | 'stock-in'>('sell');
+    const [scannedResult, setScannedResult] = useState('');
+    const [message, setMessage] = useState<{ text: string; type: MessageType }>({ text: '', type: 'info' });
+    const [products, setProducts] = useState<Product[]>([]);
+    const [showScanner, setShowScanner] = useState(false);
+    const [newItemName, setNewItemName] = useState('');
+    const [newItemQuantity, setNewItemQuantity] = useState(1);
+
+    const fetchProducts = async () => {
+        try {
+            const res = await fetch('/api/stock');
+            const data = await res.json();
+            setProducts(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error("Gagal fetch produk:", error);
+            setMessage({text: 'Gagal memuat daftar produk.', type: 'error'})
+        }
+    };
+    useEffect(() => { fetchProducts(); }, []);
+
+    const showMessage = (text: string, type: MessageType = 'info') => {
+        setMessage({ text, type });
+        setTimeout(() => setMessage({ text: '', type: 'info' }), 4000);
+    };
+
+    const handleScanResult = (result: string) => {
+        setShowScanner(false); 
+        if (result) {
+            setScannedResult(result);
+            if (mode === 'sell') handleSell(result);
+        }
+    };
+
+    const handleSell = async (qrCode: string) => {
+        showMessage('Memproses penjualan...');
+        try {
+            const response = await fetch('/api/sell', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ qrCode }),
+            });
+            const data = await response.json();
+            showMessage(data.message, response.ok ? 'success' : 'error');
+            if (response.ok) fetchProducts();
+        } catch (err) { showMessage('Error: Terjadi kesalahan pada server.', 'error'); }
+        setScannedResult('');
+    };
+
+    const handleStockIn = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        showMessage('Menambah stok...');
+        try {
+            const response = await fetch('/api/stock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ qrCode: scannedResult, name: newItemName, quantity: newItemQuantity }),
+            });
+            const data = await response.json();
+            showMessage(data.message, response.ok ? 'success' : 'error');
+            if (response.ok) {
+                fetchProducts();
+                setScannedResult('');
+                setNewItemName('');
+                setNewItemQuantity(1);
+            }
+        } catch (err) { showMessage('Error: Terjadi kesalahan pada server.', 'error'); }
+    };
+
+    const messageStyles: { [key in MessageType]: string } = {
+        info: 'bg-blue-100 border-blue-400 text-blue-700',
+        success: 'bg-green-100 border-green-400 text-green-700',
+        error: 'bg-red-100 border-red-400 text-red-700',
+    };
+
+    return (
+        <main className="container mx-auto p-4 font-sans">
+            <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">🏪 Sistem Inventaris Toko</h1>
+            <div className="flex justify-center gap-4 mb-4">
+                <button onClick={() => { setMode('sell'); setShowScanner(true); setScannedResult(''); }} className={`px-6 py-2 rounded-lg font-semibold shadow-sm transition-transform transform hover:scale-105 ${mode === 'sell' ? 'bg-red-500 text-white' : 'bg-white text-gray-700 border'}`}>
+                    🛒 Jual Barang
+                </button>
+                <button onClick={() => { setMode('stock-in'); setShowScanner(true); setScannedResult(''); }} className={`px-6 py-2 rounded-lg font-semibold shadow-sm transition-transform transform hover:scale-105 ${mode === 'stock-in' ? 'bg-green-500 text-white' : 'bg-white text-gray-700 border'}`}>
+                    📦 Tambah Stok
+                </button>
+            </div>
+            {message.text && (<p className={`text-center my-4 p-3 border rounded-md ${messageStyles[message.type]}`}>{message.text}</p>)}
+            {showScanner && (
+                <div className="max-w-md mx-auto my-4 p-2 border-2 border-dashed rounded-lg">
+                    <QrScanner onScanSuccess={handleScanResult} onClose={() => setShowScanner(false)} />
+                </div>
+            )}
+            {mode === 'stock-in' && scannedResult && (
+                <form onSubmit={handleStockIn} className="max-w-md mx-auto p-6 border rounded-lg shadow-md bg-white">
+                    <h3 className="text-lg font-bold mb-2">Form Tambah Stok</h3>
+                    <p className="mb-4 p-2 bg-gray-100 rounded break-words"><strong>QR Code:</strong> {scannedResult}</p>
+                    <div className="mb-4">
+                        <label htmlFor="name" className="block mb-1 font-medium text-gray-700">Nama Produk</label>
+                        <input id="name" type="text" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="w-full p-2 border rounded-md" placeholder="Contoh: Kopi Sachet ABC" required />
+                    </div>
+                    <div className="mb-4">
+                        <label htmlFor="quantity" className="block mb-1 font-medium text-gray-700">Jumlah</label>
+                        <input id="quantity" type="number" min="1" value={newItemQuantity} onChange={(e) => setNewItemQuantity(Number(e.target.value))} className="w-full p-2 border rounded-md" required />
+                    </div>
+                    <button type="submit" className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-md">Simpan ke Inventaris</button>
+                </form>
+            )}
+            <div className="mt-12">
+                <h2 className="text-2xl font-bold mb-4">📦 Inventaris Saat Ini</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {products.length > 0 ? products.map(product => (
+                        <div key={product.id} className="border p-4 rounded-lg shadow-sm bg-white">
+                            <h3 className="font-bold text-lg text-gray-800">{product.name}</h3>
+                            <p className="text-gray-500 break-words text-sm mt-1">QR: {product.qrCode}</p>
+                            <p className="text-3xl font-bold mt-2 text-indigo-600">Stok: {product.stock}</p>
+                        </div>
+                    )) : (<p>Inventaris kosong.</p>)}
+                </div>
+            </div>
+            <SalesReport />
+        </main>
+    );
 }
