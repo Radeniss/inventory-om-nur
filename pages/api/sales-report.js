@@ -1,40 +1,61 @@
-import fs from 'fs';
-import path from 'path';
+import clientPromise from '../../lib/mongodb';
 
-const dbPath = path.resolve(process.cwd(), 'data', 'db.json');
-const readDb = () => JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).end('Method Not Allowed');
+  }
 
-export default function handler(req, res) {
-    if (req.method !== 'GET') {
-        return res.status(405).end('Method Not Allowed');
-    }
+  const { month, year } = req.query;
+  if (!month || !year) {
+    return res.status(400).json({ message: 'Mohon tentukan bulan dan tahun' });
+  }
 
-    const { month, year } = req.query;
-    if (!month || !year) {
-        return res.status(400).json({ message: 'Mohon tentukan bulan dan tahun' });
-    }
+  try {
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB);
+    const salesCollection = db.collection('sales');
 
-    try {
-        const db = readDb();
-        const filteredSales = db.sales.filter(sale => {
-            const saleDate = new Date(sale.saleTimestamp);
-            return (saleDate.getMonth() + 1) == month && saleDate.getFullYear() == year;
-        });
+    const monthInt = parseInt(month);
+    const yearInt = parseInt(year);
 
-        const report = filteredSales.reduce((acc, sale) => {
-            if (!acc[sale.productId]) {
-                acc[sale.productId] = {
-                    productName: sale.productName,
-                    totalSold: 0
-                };
-            }
-            acc[sale.productId].totalSold += sale.quantitySold;
-            return acc;
-        }, {});
+    const report = await salesCollection.aggregate([
+      // Tahap 1: Filter dokumen berdasarkan bulan dan tahun
+      {
+        $match: {
+          $expr: {
+            $and: [
+              { $eq: [{ $year: '$saleTimestamp' }, yearInt] },
+              { $eq: [{ $month: '$saleTimestamp' }, monthInt] },
+            ],
+          },
+        },
+      },
+      // Tahap 2: Kelompokkan berdasarkan nama produk dan jumlahkan penjualannya
+      {
+        $group: {
+          _id: '$productName',
+          totalSold: { $sum: '$quantitySold' },
+        },
+      },
+      // Tahap 3: Ubah format output agar lebih mudah dibaca
+      {
+        $project: {
+          _id: 0,
+          productName: '$_id',
+          totalSold: '$totalSold',
+        },
+      },
+      // Tahap 4: Urutkan dari yang paling banyak terjual
+      {
+        $sort: {
+          totalSold: -1,
+        },
+      },
+    ]).toArray();
 
-        const finalReport = Object.values(report).sort((a, b) => b.totalSold - a.totalSold);
-        res.status(200).json(finalReport);
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal mengambil laporan penjualan.' });
-    }
+    res.status(200).json(report);
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
+  }
 }

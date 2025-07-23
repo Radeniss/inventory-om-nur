@@ -1,11 +1,7 @@
-import fs from 'fs';
-import path from 'path';
+import clientPromise from '../../lib/mongodb';
+import { ObjectId } from 'mongodb';
 
-const dbPath = path.resolve(process.cwd(), 'data', 'db.json');
-const readDb = () => JSON.parse(fs.readFileSync(dbPath, 'utf-8'));
-const writeDb = (data) => fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
-
-export default function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).end('Method Not Allowed');
   }
@@ -16,29 +12,38 @@ export default function handler(req, res) {
   }
 
   try {
-    const db = readDb();
-    const productIndex = db.products.findIndex(p => p.qrCode === qrCode);
+    const client = await clientPromise;
+    const db = client.db(process.env.MONGODB_DB);
+    const productsCollection = db.collection('products');
+    const salesCollection = db.collection('sales');
 
-    if (productIndex === -1) {
+    const product = await productsCollection.findOne({ qrCode: qrCode });
+
+    if (!product) {
       return res.status(404).json({ message: 'Produk tidak ditemukan' });
     }
-    if (db.products[productIndex].stock <= 0) {
+    if (product.stock <= 0) {
       return res.status(400).json({ message: 'Stok produk habis!' });
     }
 
-    db.products[productIndex].stock -= 1;
-    db.sales.push({
-      id: `SALE-${Date.now()}`,
-      productId: db.products[productIndex].id,
-      qrCode: qrCode,
-      productName: db.products[productIndex].name,
+    // Kurangi stok produk
+    await productsCollection.updateOne(
+      { _id: product._id },
+      { $inc: { stock: -1 } }
+    );
+
+    // Catat penjualan baru
+    await salesCollection.insertOne({
+      productId: product._id,
+      productName: product.name,
+      qrCode: product.qrCode,
       quantitySold: 1,
-      saleTimestamp: new Date().toISOString(),
+      saleTimestamp: new Date(), // Simpan sebagai BSON date untuk query yang lebih baik
     });
 
-    writeDb(db);
-    res.status(200).json({ message: `Penjualan ${db.products[productIndex].name} berhasil` });
-  } catch (error) {
-    res.status(500).json({ message: 'Gagal memproses penjualan.' });
+    res.status(200).json({ message: `Penjualan ${product.name} berhasil` });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Terjadi kesalahan pada server' });
   }
 }
