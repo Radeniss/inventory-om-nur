@@ -4,13 +4,11 @@ import { ObjectId } from 'mongodb';
 import { authOptions } from "./auth/[...nextauth]";
 
 export default async function handler(req, res) {
-  // 1. Cek sesi login
   const session = await getServerSession(req, res, authOptions);
   if (!session) {
     return res.status(401).json({ message: "Akses ditolak." });
   }
 
-  // 2. Dapatkan ID pengguna
   const userId = new ObjectId(session.user.id);
   const { month, year } = req.query;
 
@@ -27,13 +25,11 @@ export default async function handler(req, res) {
     const yearInt = parseInt(year);
 
     const report = await salesCollection.aggregate([
-      // Tahap 1: Filter penjualan HANYA milik pengguna yang login
       {
         $match: {
           userId: userId,
         }
       },
-      // Tahap 2: Filter berdasarkan bulan dan tahun
       {
         $match: {
           $expr: {
@@ -44,14 +40,12 @@ export default async function handler(req, res) {
           },
         },
       },
-      // Tahap 3: Kelompokkan berdasarkan nama produk dan jumlahkan penjualannya
       {
         $group: {
           _id: '$productName',
           totalSold: { $sum: '$quantitySold' },
         },
       },
-      // Tahap 4: Ubah format output
       {
         $project: {
           _id: 0,
@@ -59,7 +53,6 @@ export default async function handler(req, res) {
           totalSold: '$totalSold',
         },
       },
-      // Tahap 5: Urutkan
       {
         $sort: {
           totalSold: -1,

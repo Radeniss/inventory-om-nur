@@ -8,13 +8,11 @@ export default async function handler(req, res) {
     return res.status(405).end('Method Not Allowed');
   }
 
-  // 1. Cek sesi login
   const session = await getServerSession(req, res, authOptions);
   if (!session) {
     return res.status(401).json({ message: "Akses ditolak." });
   }
 
-  // 2. Dapatkan ID pengguna
   const userId = new ObjectId(session.user.id);
   const { qrCode } = req.body;
 
@@ -28,7 +26,6 @@ export default async function handler(req, res) {
     const productsCollection = db.collection('products');
     const salesCollection = db.collection('sales');
 
-    // 3. Cari produk berdasarkan qrCode DAN userId
     const product = await productsCollection.findOne({ qrCode: qrCode, userId: userId });
 
     if (!product) {
@@ -38,15 +35,13 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Stok produk habis!' });
     }
 
-    // Kurangi stok produk
     await productsCollection.updateOne(
-      { _id: product._id, userId: userId }, // Pastikan hanya bisa mengubah produk sendiri
+      { _id: product._id, userId: userId },
       { $inc: { stock: -1 } }
     );
 
-    // Catat penjualan baru dengan userId
     await salesCollection.insertOne({
-      userId: userId, // Catat siapa yang menjual
+      userId: userId,
       productId: product._id,
       productName: product.name,
       qrCode: product.qrCode,

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useSession, signIn, signOut } from 'next-auth/react'; // Impor hook dari NextAuth
+import { useSession, signIn, signOut } from 'next-auth/react';
+import Link from 'next/link';
 import QrScanner from '../components/QrScanner'; 
 
-// --- Komponen SalesReport (Tidak berubah) ---
+// --- Komponen SalesReport ---
 type SalesReportItem = { productName: string; totalSold: number; };
 const SalesReport = () => {
     const [report, setReport] = useState<SalesReportItem[]>([]);
@@ -58,16 +59,14 @@ const SalesReport = () => {
     );
 };
 
-
 // --- Komponen Utama ---
-type Product = { id: string; name: string; qrCode: string; stock: number };
+type Product = { _id: string; name: string; qrCode: string; stock: number };
 type MessageType = 'info' | 'success' | 'error';
 
 export default function HomePage() {
-    // Hook untuk mendapatkan data sesi login
     const { data: session, status } = useSession();
 
-    // Semua state aplikasi Anda
+    // State untuk aplikasi inventaris
     const [mode, setMode] = useState<'sell' | 'stock-in'>('sell');
     const [scannedResult, setScannedResult] = useState('');
     const [message, setMessage] = useState<{ text: string; type: MessageType }>({ text: '', type: 'info' });
@@ -75,8 +74,11 @@ export default function HomePage() {
     const [showScanner, setShowScanner] = useState(false);
     const [newItemName, setNewItemName] = useState('');
     const [newItemQuantity, setNewItemQuantity] = useState(1);
+
+    // State untuk form login
+    const [loginEmail, setLoginEmail] = useState('');
+    const [loginPassword, setLoginPassword] = useState('');
     
-    // Semua fungsi handler Anda
     const fetchProducts = useCallback(async () => {
         try {
             const res = await fetch('/api/stock');
@@ -84,7 +86,6 @@ export default function HomePage() {
                 const data = await res.json();
                 setProducts(Array.isArray(data) ? data : []);
             } else {
-                // Jika gagal (misal: 401 Unauthorized), kosongkan produk
                 setProducts([]);
             }
         } catch (error) {
@@ -93,7 +94,6 @@ export default function HomePage() {
         }
     }, []);
 
-    // Gunakan useEffect untuk memuat data HANYA jika sudah login
     useEffect(() => {
         if (status === "authenticated") {
             fetchProducts();
@@ -103,6 +103,22 @@ export default function HomePage() {
     const showMessage = (text: string, type: MessageType = 'info') => {
         setMessage({ text, type });
         setTimeout(() => setMessage({ text: '', type: 'info' }), 4000);
+    };
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        showMessage('Mencoba login...', 'info');
+        const result = await signIn('credentials', {
+            redirect: false,
+            email: loginEmail,
+            password: loginPassword,
+        });
+
+        if (result?.error) {
+            showMessage(result.error, 'error');
+        } else {
+            showMessage('Login berhasil!', 'success');
+        }
     };
     
     const handleScanResult = (result: string) => {
@@ -114,13 +130,9 @@ export default function HomePage() {
     };
 
     const handleSell = async (qrCode: string) => {
-        showMessage('Memproses penjualan...');
+        showMessage('Memproses penjualan...', 'info');
         try {
-            const response = await fetch('/api/sell', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ qrCode }),
-            });
+            const response = await fetch('/api/sell', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrCode }) });
             const data = await response.json();
             showMessage(data.message, response.ok ? 'success' : 'error');
             if (response.ok) fetchProducts();
@@ -130,13 +142,9 @@ export default function HomePage() {
 
     const handleStockIn = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        showMessage('Menambah stok...');
+        showMessage('Menambah stok...', 'info');
         try {
-            const response = await fetch('/api/stock', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ qrCode: scannedResult, name: newItemName, quantity: newItemQuantity }),
-            });
+            const response = await fetch('/api/stock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ qrCode: scannedResult, name: newItemName, quantity: newItemQuantity }) });
             const data = await response.json();
             showMessage(data.message, response.ok ? 'success' : 'error');
             if (response.ok) {
@@ -154,25 +162,42 @@ export default function HomePage() {
         error: 'bg-red-100 border-red-400 text-red-700',
     };
 
-    // Tampilkan loading saat status sesi sedang diperiksa
     if (status === "loading") {
         return <p className="text-center mt-20 text-lg">Memuat...</p>;
     }
 
-    // Tampilkan halaman login jika pengguna belum terotentikasi
     if (status === "unauthenticated") {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-                <h1 className="text-3xl font-bold mb-4">Aplikasi Inventaris</h1>
-                <p className="mb-6 text-gray-600">Silakan login untuk melanjutkan.</p>
-                <button onClick={() => signIn()} className="bg-blue-500 text-white px-6 py-2 rounded-lg shadow-md hover:bg-blue-600 transition">
-                    Login / Signup
-                </button>
+            <div className="flex items-center justify-center min-h-screen bg-gray-50">
+                <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
+                    <h1 className="text-2xl font-bold text-center">Login Inventaris</h1>
+                    <form onSubmit={handleLogin} className="space-y-6">
+                        <div>
+                            <label htmlFor="email-login" className="block text-sm font-medium text-gray-700">Email</label>
+                            <input id="email-login" type="email" required value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full px-3 py-2 mt-1 border rounded-md"/>
+                        </div>
+                        <div>
+                            <label htmlFor="password-login" className="block text-sm font-medium text-gray-700">Password</label>
+                            <input id="password-login" type="password" required value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full px-3 py-2 mt-1 border rounded-md"/>
+                        </div>
+                        <div>
+                            <button type="submit" className="w-full px-4 py-2 font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">
+                                Login
+                            </button>
+                        </div>
+                    </form>
+                    {message.text && (<p className={`text-center text-sm mt-4 p-2 rounded-md ${messageStyles[message.type]}`}>{message.text}</p>)}
+                    <p className="text-sm text-center text-gray-600">
+                        Belum punya akun?{' '}
+                        <Link href="/auth/signup" className="font-medium text-blue-600 hover:text-blue-500">
+                            Daftar di sini
+                        </Link>
+                    </p>
+                </div>
             </div>
         );
     }
 
-    // Tampilkan aplikasi utama jika pengguna sudah login
     return (
         <main className="container mx-auto p-4 font-sans">
             <header className="flex justify-between items-center mb-6 pb-4 border-b">
@@ -181,7 +206,6 @@ export default function HomePage() {
                     Logout
                 </button>
             </header>
-
             <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">🏪 Sistem Inventaris Toko</h1>
             <div className="flex justify-center gap-4 mb-4">
                 <button onClick={() => { setMode('sell'); setShowScanner(true); setScannedResult(''); }} className={`px-6 py-2 rounded-lg font-semibold shadow-sm transition-transform transform hover:scale-105 ${mode === 'sell' ? 'bg-red-500 text-white' : 'bg-white text-gray-700 border'}`}>
@@ -216,7 +240,7 @@ export default function HomePage() {
                 <h2 className="text-2xl font-bold mb-4">📦 Inventaris Saat Ini</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {products.length > 0 ? products.map(product => (
-                        <div key={product.id} className="border p-4 rounded-lg shadow-sm bg-white">
+                        <div key={product._id} className="border p-4 rounded-lg shadow-sm bg-white">
                             <h3 className="font-bold text-lg text-gray-800">{product.name}</h3>
                             <p className="text-gray-500 break-words text-sm mt-1">QR: {product.qrCode}</p>
                             <p className="text-3xl font-bold mt-2 text-indigo-600">Stok: {product.stock}</p>
@@ -224,7 +248,6 @@ export default function HomePage() {
                     )) : (<p className='text-gray-500'>Inventaris Anda kosong.</p>)}
                 </div>
             </div>
-            {/* Hanya tampilkan laporan jika ada produk */}
             {products.length > 0 && <SalesReport />}
         </main>
     );
