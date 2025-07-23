@@ -18,20 +18,21 @@ const QrScanner = ({ onScanSuccess, onClose }: QrScannerProps) => {
         );
 
         const handleSuccess = (decodedText: string, _decodedResult: Html5QrcodeResult) => {
-            scanner.clear().catch(error => {
-                console.error("Gagal membersihkan scanner.", error);
-            });
+            if (scanner) {
+                scanner.clear().catch(error => {
+                    console.error("Gagal membersihkan scanner.", error);
+                });
+            }
             onScanSuccess(decodedText);
         };
-
+        
         const handleError = (_errorMessage: string) => {
+            // Abaikan error
         };
         
         scanner.render(handleSuccess, handleError);
 
-        // Fungsi cleanup
         return () => {
-            // Cek apakah scanner masih aktif sebelum membersihkan
             if (scanner && scanner.getState()) {
                 scanner.clear().catch(error => {
                     console.error("Gagal membersihkan scanner saat unmount.", error);

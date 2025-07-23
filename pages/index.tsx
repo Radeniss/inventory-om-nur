@@ -136,7 +136,10 @@ export default function HomePage() {
             const data = await response.json();
             showMessage(data.message, response.ok ? 'success' : 'error');
             if (response.ok) fetchProducts();
-        } catch (err) { showMessage('Error: Terjadi kesalahan pada server.', 'error'); }
+        } catch (error) { 
+          console.error(error);
+          showMessage('Error: Terjadi kesalahan pada server.', 'error'); 
+}
         setScannedResult('');
     };
 
@@ -153,7 +156,10 @@ export default function HomePage() {
                 setNewItemName('');
                 setNewItemQuantity(1);
             }
-        } catch (err) { showMessage('Error: Terjadi kesalahan pada server.', 'error'); }
+        } catch (error) {
+          console.error(error);
+          showMessage('Error: Terjadi kesalahan pada server.', 'error'); 
+}
     };
 
     const messageStyles: { [key in MessageType]: string } = {
